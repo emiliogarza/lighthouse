@@ -158,7 +158,7 @@ function makeComparison(name, actualResult, expectedResult) {
  * @param {Smokehouse.ExpectedRunnerResult} expected
  */
 function pruneExpectations(localConsole, lhr, expected) {
-  const userAgent = lhr.userAgent;
+  const userAgent = lhr.environment.hostUserAgent;
   const userAgentMatch = /Chrome\/(\d+)/.exec(userAgent); // Chrome/85.0.4174.0
   if (!userAgentMatch) throw new Error('Could not get chrome version.');
   const actualChromeVersion = Number(userAgentMatch[1]);
