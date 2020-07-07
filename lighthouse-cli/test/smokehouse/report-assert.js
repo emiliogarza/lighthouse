@@ -198,8 +198,6 @@ function pruneExpectations(localConsole, lhr, expected) {
  * @return {Comparison[]}
  */
 function collateResults(localConsole, actual, expected) {
-  pruneExpectations(localConsole, actual.lhr, expected);
-
   // If actual run had a runtimeError, expected *must* have a runtimeError.
   // Relies on the fact that an `undefined` argument to makeComparison() can only match `undefined`.
   const runtimeErrorAssertion = makeComparison('runtimeError', actual.lhr.runtimeError,
@@ -327,6 +325,7 @@ function assertLogString(count) {
 function report(actual, expected, reportOptions = {}) {
   const localConsole = new LocalConsole();
 
+  pruneExpectations(localConsole, actual.lhr, expected);
   const comparisons = collateResults(localConsole, actual, expected);
 
   let correctCount = 0;

@@ -176,8 +176,6 @@ module.exports = [
           },
         },
         'layout-shift-elements': {
-          // ?? testing
-          // _minChromiumMilestone: 84,
           score: null,
           displayValue: '2 elements found',
           details: {
