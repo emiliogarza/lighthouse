@@ -167,8 +167,8 @@ function pruneExpectations(localConsole, lhr, expected) {
    * @param {*} obj
    */
   function failsChromeVersionCheck(obj) {
-    if (!obj._minChromeMajorVersion) return false;
-    return actualChromeVersion < obj._minChromeMajorVersion;
+    if (!obj._minChromiumMilestone) return false;
+    return actualChromeVersion < obj._minChromiumMilestone;
   }
 
   /**
@@ -184,7 +184,7 @@ function pruneExpectations(localConsole, lhr, expected) {
         delete obj[key];
       } else pruneNewerChromeExpectations(value);
     }
-    delete obj._minChromeMajorVersion;
+    delete obj._minChromiumMilestone;
   }
 
   pruneNewerChromeExpectations(expected);
