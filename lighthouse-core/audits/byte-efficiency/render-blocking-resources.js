@@ -43,9 +43,10 @@ const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
 /**
  * Given a simulation's nodeTimings, return an object with the nodes/timing keyed by network URL
  * @param {LH.Gatherer.Simulation.Result['nodeTimings']} nodeTimings
+ * @param {boolean} usesAMP
  * @return {Object<string, {node: Node, nodeTiming: LH.Gatherer.Simulation.NodeTiming}>}
  */
-function getNodesAndTimingByUrl(nodeTimings) {
+function getNodesAndTimingByUrl(nodeTimings, usesAMP) {
   /** @type {Object<string, {node: Node, nodeTiming: LH.Gatherer.Simulation.NodeTiming}>} */
   const urlMap = {};
   const nodes = Array.from(nodeTimings.keys());
@@ -53,6 +54,12 @@ function getNodesAndTimingByUrl(nodeTimings) {
     if (node.type !== 'network') return;
     const nodeTiming = nodeTimings.get(node);
     if (!nodeTiming) return;
+
+    if (usesAMP && node.record.resourceType === 'Stylesheet'
+        && nodeTiming.duration > 1000) {
+      nodeTiming.endTime = nodeTiming.startTime + 1000;
+      nodeTiming.duration = 1000;
+    }
 
     urlMap[node.record.url] = {node, nodeTiming};
   });
@@ -72,7 +79,7 @@ class RenderBlockingResources extends Audit {
       description: str_(UIStrings.description),
       // TODO: look into adding an `optionalArtifacts` property that captures the non-required nature
       // of CSSUsage
-      requiredArtifacts: ['URL', 'TagsBlockingFirstPaint', 'traces', 'devtoolsLogs', 'CSSUsage'],
+      requiredArtifacts: ['URL', 'TagsBlockingFirstPaint', 'traces', 'devtoolsLogs', 'CSSUsage', 'Stacks'],
     };
   }
 
@@ -82,6 +89,7 @@ class RenderBlockingResources extends Audit {
    * @return {Promise<{wastedMs: number, results: Array<{url: string, totalBytes: number, wastedMs: number}>}>}
    */
   static async computeResults(artifacts, context) {
+    const usesAMP = artifacts.Stacks.some(stack => stack.id === 'amp');
     const trace = artifacts.traces[Audit.DEFAULT_PASS];
     const devtoolsLog = artifacts.devtoolsLogs[Audit.DEFAULT_PASS];
     const simulatorData = {devtoolsLog, settings: context.settings};
@@ -95,7 +103,7 @@ class RenderBlockingResources extends Audit {
     const fcpSimulation = await FirstContentfulPaint.request(metricComputationData, context);
     const fcpTsInMs = traceOfTab.timestamps.firstContentfulPaint / 1000;
 
-    const nodesByUrl = getNodesAndTimingByUrl(fcpSimulation.optimisticEstimate.nodeTimings);
+    const nodesByUrl = getNodesAndTimingByUrl(fcpSimulation.optimisticEstimate.nodeTimings, usesAMP);
 
     const results = [];
     const deferredNodeIds = new Set();
