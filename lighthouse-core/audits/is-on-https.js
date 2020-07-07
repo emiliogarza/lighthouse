@@ -31,15 +31,15 @@ const UIStrings = {
   /** Label for a column in a data table; entries in the column will be the URLs of insecure (non-HTTPS) network requests. */
   columnInsecureURL: 'Insecure URL',
   /** Label for a column in a data table; entries in the column will be how the browser handled insecure (non-HTTPS) network requests. */
-  columnResolution: 'Resolution',
+  columnResolution: 'Request Resolution',
   /** Value for the resolution column in a data table; denotes that the insecure URL was allowed by the browser. */
   allowed: 'Allowed',
   /** Value for the resolution column in a data table; denotes that the insecure URL was blocked by the browser. */
   blocked: 'Blocked',
   /** Value for the resolution column in a data table; denotes that the insecure URL may be blocked by the browser in the future. */
-  warning: 'Warned',
+  warning: 'Allowed with warning',
   /** Value for the resolution column in a data table; denotes that the insecure URL was upgraded to a secure request by the browser. */
-  upgraded: 'Automatically Upgraded',
+  upgraded: 'Automatically upgraded to HTTPS',
 };
 
 const resolutionToString = {
