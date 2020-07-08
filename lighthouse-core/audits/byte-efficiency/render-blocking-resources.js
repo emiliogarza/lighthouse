@@ -43,10 +43,9 @@ const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
 /**
  * Given a simulation's nodeTimings, return an object with the nodes/timing keyed by network URL
  * @param {LH.Gatherer.Simulation.Result['nodeTimings']} nodeTimings
- * @param {boolean} usesAMP
  * @return {Object<string, {node: Node, nodeTiming: LH.Gatherer.Simulation.NodeTiming}>}
  */
-function getNodesAndTimingByUrl(nodeTimings, usesAMP) {
+function getNodesAndTimingByUrl(nodeTimings) {
   /** @type {Object<string, {node: Node, nodeTiming: LH.Gatherer.Simulation.NodeTiming}>} */
   const urlMap = {};
   const nodes = Array.from(nodeTimings.keys());
@@ -55,16 +54,29 @@ function getNodesAndTimingByUrl(nodeTimings, usesAMP) {
     const nodeTiming = nodeTimings.get(node);
     if (!nodeTiming) return;
 
-    if (usesAMP && node.record.resourceType === 'Stylesheet'
-        && nodeTiming.duration > 1000) {
-      nodeTiming.endTime = nodeTiming.startTime + 1000;
-      nodeTiming.duration = 1000;
-    }
-
     urlMap[node.record.url] = {node, nodeTiming};
   });
 
   return urlMap;
+}
+
+/**
+ *
+ * @param {Node} node
+ * @param {LH.Gatherer.Simulation.NodeTiming} nodeTiming
+ * @param {LH.Artifacts.DetectedStack[]} Stacks
+ */
+function computeStackSpecificTiming(node, nodeTiming, Stacks) {
+  let stackSpecificTiming = Object.assign({}, nodeTiming);
+  if (Stacks.some(stack => stack.id === 'amp')) {
+    if (node.type === 'network' &&
+        node.record.resourceType == NetworkRequest.TYPES.Stylesheet &&
+        nodeTiming.duration > 1000) {
+      stackSpecificTiming.endTime = nodeTiming.startTime + 1000;
+      stackSpecificTiming.duration = 1000;
+    }
+  }
+  return stackSpecificTiming;
 }
 
 class RenderBlockingResources extends Audit {
@@ -89,7 +101,6 @@ class RenderBlockingResources extends Audit {
    * @return {Promise<{wastedMs: number, results: Array<{url: string, totalBytes: number, wastedMs: number}>}>}
    */
   static async computeResults(artifacts, context) {
-    const usesAMP = artifacts.Stacks.some(stack => stack.id === 'amp');
     const trace = artifacts.traces[Audit.DEFAULT_PASS];
     const devtoolsLog = artifacts.devtoolsLogs[Audit.DEFAULT_PASS];
     const simulatorData = {devtoolsLog, settings: context.settings};
@@ -103,7 +114,7 @@ class RenderBlockingResources extends Audit {
     const fcpSimulation = await FirstContentfulPaint.request(metricComputationData, context);
     const fcpTsInMs = traceOfTab.timestamps.firstContentfulPaint / 1000;
 
-    const nodesByUrl = getNodesAndTimingByUrl(fcpSimulation.optimisticEstimate.nodeTimings, usesAMP);
+    const nodesByUrl = getNodesAndTimingByUrl(fcpSimulation.optimisticEstimate.nodeTimings);
 
     const results = [];
     const deferredNodeIds = new Set();
@@ -115,11 +126,13 @@ class RenderBlockingResources extends Audit {
 
       const {node, nodeTiming} = nodesByUrl[resource.tag.url];
 
+      const stackSpecificTiming = computeStackSpecificTiming(node, nodeTiming, artifacts.Stacks);
+
       // Mark this node and all its dependents as deferrable
       node.traverse(node => deferredNodeIds.add(node.id));
 
       // "wastedMs" is the download time of the network request, responseReceived - requestSent
-      const wastedMs = Math.round(nodeTiming.duration);
+      const wastedMs = Math.round(stackSpecificTiming.duration);
       if (wastedMs < MINIMUM_WASTED_MS) continue;
 
       results.push({
