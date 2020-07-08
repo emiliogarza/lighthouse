@@ -67,14 +67,14 @@ function getNodesAndTimingByUrl(nodeTimings) {
  * @param {LH.Artifacts.DetectedStack[]} Stacks
  */
 function computeStackSpecificTiming(node, nodeTiming, Stacks) {
-  let stackSpecificTiming = Object.assign({}, nodeTiming);
-  if(!Stacks) return stackSpecificTiming;
+  const stackSpecificTiming = Object.assign({}, nodeTiming);
+  if (!Stacks) return stackSpecificTiming;
   if (Stacks.some(stack => stack.id === 'amp')) {
     // AMP will load a linked stylesheet asynchronously if it has not been loaded after 1 second [https://github.com/ampproject/amphtml/blob/master/src/font-stylesheet-timeout.js]
     // Any potential savings for AMP stylesheet nodes must therefore be capped at 1 second.
     // https://github.com/GoogleChrome/lighthouse/issues/2832#issuecomment-591066081
     if (node.type === 'network' &&
-        node.record.resourceType == NetworkRequest.TYPES.Stylesheet &&
+        node.record.resourceType === NetworkRequest.TYPES.Stylesheet &&
         nodeTiming.duration > 1000) {
       stackSpecificTiming.endTime = nodeTiming.startTime + 1000;
       stackSpecificTiming.duration = 1000;
@@ -95,7 +95,8 @@ class RenderBlockingResources extends Audit {
       description: str_(UIStrings.description),
       // TODO: look into adding an `optionalArtifacts` property that captures the non-required nature
       // of CSSUsage
-      requiredArtifacts: ['URL', 'TagsBlockingFirstPaint', 'traces', 'devtoolsLogs', 'CSSUsage', 'Stacks'],
+      requiredArtifacts: ['URL', 'TagsBlockingFirstPaint', 'traces', 'devtoolsLogs', 'CSSUsage',
+        'Stacks'],
     };
   }
 
@@ -179,8 +180,8 @@ class RenderBlockingResources extends Audit {
    * @return {number}
    */
   static estimateSavingsWithGraphs(simulator, fcpGraph, deferredIds, wastedCssBytesByUrl, Stacks) {
-    const originalEstimate = simulator.simulate(fcpGraph, {label: 'render-blocking-estimate'}).timeInMs;
-    const originalNodeTimings = Simulator.ALL_NODE_TIMINGS.get('render-blocking-estimate');
+    const originalEstimate = simulator.simulate(fcpGraph, {label: 'rbr-estimate'}).timeInMs;
+    const originalNodeTimings = Simulator.ALL_NODE_TIMINGS.get('rbr-estimate');
 
     let stackSpecificEstimate = originalEstimate;
 
