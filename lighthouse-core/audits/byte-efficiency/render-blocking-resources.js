@@ -12,6 +12,7 @@
 const Audit = require('../audit.js');
 const i18n = require('../../lib/i18n/i18n.js');
 const BaseNode = require('../../lib/dependency-graph/base-node.js');
+const Simulator = require('../../lib/dependency-graph/simulator/simulator.js');
 const ByteEfficiencyAudit = require('./byte-efficiency-audit.js');
 const UnusedCSS = require('../../computed/unused-css.js');
 const NetworkRequest = require('../../lib/network-request.js');
@@ -68,6 +69,7 @@ function getNodesAndTimingByUrl(nodeTimings) {
  */
 function computeStackSpecificTiming(node, nodeTiming, Stacks) {
   let stackSpecificTiming = Object.assign({}, nodeTiming);
+  if(!Stacks) return stackSpecificTiming;
   if (Stacks.some(stack => stack.id === 'amp')) {
     if (node.type === 'network' &&
         node.record.resourceType == NetworkRequest.TYPES.Stylesheet &&
@@ -150,7 +152,8 @@ class RenderBlockingResources extends Audit {
       simulator,
       fcpSimulation.optimisticGraph,
       deferredNodeIds,
-      wastedCssBytes
+      wastedCssBytes,
+      artifacts.Stacks
     );
 
     return {results, wastedMs};
@@ -170,13 +173,24 @@ class RenderBlockingResources extends Audit {
    * @param {Node} fcpGraph
    * @param {Set<string>} deferredIds
    * @param {Map<string, number>} wastedCssBytesByUrl
+   * @param {LH.Artifacts.DetectedStack[]} Stacks
    * @return {number}
    */
-  static estimateSavingsWithGraphs(simulator, fcpGraph, deferredIds, wastedCssBytesByUrl) {
-    const originalEstimate = simulator.simulate(fcpGraph).timeInMs;
+  static estimateSavingsWithGraphs(simulator, fcpGraph, deferredIds, wastedCssBytesByUrl, Stacks) {
+    const originalEstimate = simulator.simulate(fcpGraph, {label: 'render-blocking-estimate'}).timeInMs;
+    const originalNodeTimings = Simulator.ALL_NODE_TIMINGS.get('render-blocking-estimate');
+
+    let stackSpecificEstimate = originalEstimate;
 
     let totalChildNetworkBytes = 0;
     const minimalFCPGraph = /** @type {NetworkNode} */ (fcpGraph.cloneWithRelationships(node => {
+      if (originalNodeTimings) {
+        const nodeTiming = originalNodeTimings.get(node);
+        if (nodeTiming) {
+          const stackSpecificTiming = computeStackSpecificTiming(node, nodeTiming, Stacks);
+          stackSpecificEstimate -= nodeTiming.duration - stackSpecificTiming.duration;
+        }
+      }
       // If a node can be deferred, exclude it from the new FCP graph
       const canDeferRequest = deferredIds.has(node.id);
       if (node.type !== BaseNode.TYPES.NETWORK) return !canDeferRequest;
@@ -197,7 +211,7 @@ class RenderBlockingResources extends Audit {
     minimalFCPGraph.record.transferSize = safeTransferSize + totalChildNetworkBytes;
     const estimateAfterInline = simulator.simulate(minimalFCPGraph).timeInMs;
     minimalFCPGraph.record.transferSize = originalTransferSize;
-    return Math.round(Math.max(originalEstimate - estimateAfterInline, 0));
+    return Math.round(Math.max(stackSpecificEstimate - estimateAfterInline, 0));
   }
 
   /**
